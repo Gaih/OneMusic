@@ -3,20 +3,27 @@ package com.gaih.onemusic;
 import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.Notification;
+import android.app.NotificationManager;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.Button;
@@ -38,6 +45,10 @@ public class MainActivity extends AppCompatActivity {
     private static SeekBar sbar;
     private ListView lv;
     private String uri;
+    private String name;
+    private String singer;
+    private Bitmap bitmap;
+    private long album;
     private List<Music> musicList = new ArrayList<Music>();
 
 
@@ -47,8 +58,6 @@ public class MainActivity extends AppCompatActivity {
             Bundle bundle = msg.getData();
             int duration = bundle.getInt("duration");
             int currentPosition = bundle.getInt("currentPosition");
-            Log.d("duration", "" + duration);
-            Log.d("currentPosition", "" + currentPosition);
 
             sbar.setMax(duration);
             sbar.setProgress(currentPosition);
@@ -60,10 +69,11 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        ScanMusic scanMusic = new ScanMusic();
-        scanMusic.scanMusic(MainActivity.this,musicList);
 
-        palying = (Button)findViewById(R.id.palying);
+        ScanMusic scanMusic = new ScanMusic();
+        scanMusic.scanMusic(MainActivity.this, musicList);
+
+        palying = (Button) findViewById(R.id.palying);
         lv = (ListView) findViewById(R.id.lv);
         MusicAdapter adapter = new MusicAdapter(MainActivity.this, R.layout.music_item, musicList);
         lv.setAdapter(adapter);
@@ -73,7 +83,11 @@ public class MainActivity extends AppCompatActivity {
 
                 Music music = musicList.get(position);
                 uri = music.getUri();
-                iservice.callPlayMusic(uri);
+                name = music.getName();
+                singer = music.getSinger();
+                bitmap = music.getBitmap();
+                album = music.getAlbum();
+                iservice.callPlayMusic(uri,name,singer,bitmap,album);
             }
         });
 
@@ -107,7 +121,7 @@ public class MainActivity extends AppCompatActivity {
 
     public void click1(View view) {
         if (uri != null) {
-            iservice.callPlayMusic(uri);
+            iservice.callPlayMusic(uri,name,singer,bitmap,album);
         } else {
             Snackbar snackbar = Snackbar.make(view, "没有音乐文件", Snackbar.LENGTH_SHORT);
             snackbar.show();
@@ -117,9 +131,9 @@ public class MainActivity extends AppCompatActivity {
 
     public void click2(View view) {
         iservice.callPauseMusic();
-        if (palying.getText().equals("暂停")){
+        if (palying.getText().equals("暂停")) {
             palying.setText("播放");
-        }else if (palying.getText().equals("播放")){
+        } else if (palying.getText().equals("播放")) {
             palying.setText("暂停");
 
         }
@@ -132,7 +146,6 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        unbindService(myconn);
         super.onDestroy();
     }
 
@@ -148,4 +161,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        // Inflate the menu; this adds items to the action bar if it is present.
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case R.id.action_search:
+                Toast.makeText(getApplicationContext(), "正在扫描", Toast.LENGTH_SHORT).show();
+                break;
+            case R.id.action_exit:
+                unbindService(myconn);
+                Intent intent = new Intent(this,MusicService.class);
+                stopService(intent);
+                System.exit(0);
+                break;
+            default:
+                break;
+        }
+        return true;
+    }
 }

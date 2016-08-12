@@ -45,6 +45,7 @@ public class ScanMusic {
             String album = cursor.getString((cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)));
             // 持续时间
             long duration = cursor.getLong(cursor.getColumnIndex(MediaStore.Audio.Media.DURATION));
+            Log.d("Tag",""+duration);
             // 音乐uri
             String uri = cursor.getString(cursor.getColumnIndex(MediaStore.Audio.Media.DATA));
             // 专辑封面id，根据该id可以获得专辑图片uri
@@ -57,7 +58,8 @@ public class ScanMusic {
             // 发行时间
             String year = cursor.getString((cursor.getColumnIndex(MediaStore.Audio.Media.YEAR)));
             Bitmap bitmap = getCoverUri(context, albumId,id);
-            Music music = new Music(title,artist,uri,bitmap);
+
+            Music music = new Music(title,artist,uri,bitmap,albumId);
             musicList.add(music);
         }
         cursor.close();
