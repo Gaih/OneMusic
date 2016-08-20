@@ -7,8 +7,6 @@ import android.app.TaskStackBuilder;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.Bundle;
@@ -17,9 +15,10 @@ import android.os.Message;
 import android.support.annotation.Nullable;
 import android.support.v7.app.NotificationCompat;
 import android.util.Log;
-import android.widget.ImageView;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -65,6 +64,7 @@ public class MusicService extends Service {
     }
 
     private void updateSeekBar() {
+
         if (player.isPlaying()) {
             Timer timer = new Timer();
             TimerTask task = new TimerTask() {
@@ -78,7 +78,7 @@ public class MusicService extends Service {
                         bundle.putInt("duration", duration);
                         bundle.putInt("currentPosition", currentPosition);
                         msg.setData(bundle);
-                        MainActivity.handler.sendMessage(msg);
+                        Fragment01.handler.sendMessage(msg);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -99,18 +99,21 @@ public class MusicService extends Service {
         mBuilder.setContentTitle("" + name)
                 .setContentText(name + "--" + singer)
                 .setLargeIcon(bitmap)
-                .setSmallIcon(R.drawable.app);
+                .setSmallIcon(R.drawable.icon);
 
         Timer timer = new Timer();
         TimerTask task = new TimerTask() {
             @Override
             public void run() {
-                mBuilder.setProgress(duration, currentPosition, false);
-                mNotificationManager.notify(1, mBuilder.build());
-                Log.d(currentPosition + "", "" + duration);
-                while (currentPosition == duration) {
-                    mBuilder.setProgress(0, 0, false);
+                if (player.isPlaying()) {
+                    mBuilder.setProgress(duration, currentPosition, false);
+                    mNotificationManager.notify(1, mBuilder.build());
+                    Log.d(currentPosition + "", "" + duration);
+                    while (currentPosition == duration) {
+                        mBuilder.setProgress(0, 0, false);
+                    }
                 }
+
             }
         };
         timer.schedule(task, 0, 1000);
@@ -126,23 +129,31 @@ public class MusicService extends Service {
                 );
         mBuilder.setContentIntent(resultPendingIntent);
         startForeground(1, mBuilder.build());
-
     }
 
 
-    public void playMusic(String uri, String name, String singer, Bitmap bitmap,long album) {
+    public void playMusic(int position, final ArrayList<Music> muList) {
+        if (position==muList.size()){
+            position=0;
+        }
+        player = new MediaPlayer();
+        player.reset();
         try {
-            if (player != null) {
-                player.release();
-            }
-            player = new MediaPlayer();
-            player.setDataSource(uri);
+            player.setDataSource(muList.get(position).getUri());
             player.prepare();
             player.start();
             updateSeekBar();
-            notification(name, singer, bitmap);
-        } catch (IllegalStateException e) {
-            System.out.print(e.getMessage());
+            notification(muList.get(position).getName(), muList.get(position).getSinger(), muList.get(position).getBitmap());
+            final int finalPosition = position;
+            player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+                @Override
+                public void onCompletion(MediaPlayer mp) {
+                    playMusic(finalPosition + 1, muList);
+                    Log.d("1111", "方法执行");
+
+                }
+            });
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -171,8 +182,8 @@ public class MusicService extends Service {
         }
 
         @Override
-        public void callPlayMusic(String uri, String name, String singer, Bitmap bitmap,long album) {
-            playMusic(uri, name, singer, bitmap,album);
+        public void callPlayMusic(final int position, final ArrayList<Music> mList) {
+            playMusic(position, mList);
         }
 
         @Override

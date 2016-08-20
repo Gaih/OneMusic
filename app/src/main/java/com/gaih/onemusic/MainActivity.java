@@ -12,15 +12,22 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.support.annotation.NonNull;
+import android.support.annotation.StringDef;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.app.Fragment;
+import android.support.v4.app.FragmentPagerAdapter;
 import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.content.PermissionChecker;
+import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.view.menu.MenuView;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -29,118 +36,143 @@ import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ListView;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 
+import permissions.dispatcher.NeedsPermission;
+import permissions.dispatcher.OnNeverAskAgain;
+import permissions.dispatcher.OnPermissionDenied;
+import permissions.dispatcher.OnShowRationale;
+import permissions.dispatcher.PermissionRequest;
+import permissions.dispatcher.RuntimePermissions;
+
+@RuntimePermissions
 public class MainActivity extends AppCompatActivity {
 
 
-    private Button palying;
-    private Iservice iservice;
-    private Myconn myconn;
-    private static SeekBar sbar;
-    private ListView lv;
-    private String uri;
-    private String name;
-    private String singer;
-    private Bitmap bitmap;
-    private long album;
-    private List<Music> musicList = new ArrayList<Music>();
+    @NeedsPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    void showCamera() {
 
+    }
 
-    public static Handler handler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            Bundle bundle = msg.getData();
-            int duration = bundle.getInt("duration");
-            int currentPosition = bundle.getInt("currentPosition");
+    @OnShowRationale(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    void showRationaleForCamera(final PermissionRequest request) {
+        new AlertDialog.Builder(this)
+                .setMessage("文件权限")
+                .setPositiveButton("知道了", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        request.proceed();//再次执行请求
+                    }
+                })
+                .setNegativeButton("拒绝", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        finish();
+                    }
+                })
+                .show();
+    }
 
-            sbar.setMax(duration);
-            sbar.setProgress(currentPosition);
-        }
-    };
+    @OnPermissionDenied(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    void showDeniedForCamera() {
+        Toast.makeText(this, "拒绝", Toast.LENGTH_SHORT).show();
+    }
+
+    @OnNeverAskAgain(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    void showNeverAskForCamera() {
+        Toast.makeText(this, "彻底拒绝", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        MainActivityPermissionsDispatcher.onRequestPermissionsResult(this, requestCode, grantResults);
+
+    }
+
+    private TextView mLocal;
+    private TextView mInternet;
+    private TextView mOther;
+    private ViewPager mViewPager;
+    private FragmentPagerAdapter mAdapter;
+    private ArrayList<Fragment> datas;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        MainActivityPermissionsDispatcher.showCameraWithCheck(this);
 
+        initView();
 
-        ScanMusic scanMusic = new ScanMusic();
-        scanMusic.scanMusic(MainActivity.this, musicList);
+    }
 
-        palying = (Button) findViewById(R.id.palying);
-        lv = (ListView) findViewById(R.id.lv);
-        MusicAdapter adapter = new MusicAdapter(MainActivity.this, R.layout.music_item, musicList);
-        lv.setAdapter(adapter);
-        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+    private void initView() {
+        mLocal = (TextView) findViewById(R.id.id_tv_local);
+        mInternet = (TextView) findViewById(R.id.id_tv_internet);
+        mOther = (TextView) findViewById(R.id.id_tv_other);
+        mViewPager = (ViewPager)findViewById(R.id.mViewPager);
+        datas = new ArrayList<>();
+        Fragment01 tab01 = new Fragment01();
+        Fragment02 tab02 = new Fragment02();
+        Fragment03 tab03 = new Fragment03();
+        datas.add(tab01);
+        datas.add(tab02);
+        datas.add(tab03);
+        mAdapter = new FragmentPagerAdapter(getSupportFragmentManager()) {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+            public Fragment getItem(int position) {
+                return datas.get(position);
+            }
 
-                Music music = musicList.get(position);
-                uri = music.getUri();
-                name = music.getName();
-                singer = music.getSinger();
-                bitmap = music.getBitmap();
-                album = music.getAlbum();
-                iservice.callPlayMusic(uri,name,singer,bitmap,album);
+            @Override
+            public int getCount() {
+                return datas.size();
+            }
+        };
+        mViewPager.setAdapter(mAdapter);
+        mViewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
+                resetTextView();
+                switch (position) {
+                    case 0:
+                        mLocal.setTextColor(Color.parseColor("#008000"));
+                        break;
+                    case 1:
+                        mInternet.setTextColor(0xFF008000);
+                        break;
+                    case 2:
+                        mOther.setTextColor(0xFF008000);
+                        break;
+                }
+            }
+
+            @Override
+            public void onPageSelected(int position) {
+
+            }
+
+            @Override
+            public void onPageScrollStateChanged(int state) {
+
             }
         });
-
-
-        sbar = (SeekBar) findViewById(R.id.seekBar1);
-        Intent intent = new Intent(this, MusicService.class);
-        startService(intent);
-
-        myconn = new Myconn();
-        bindService(intent, myconn, BIND_AUTO_CREATE);
-
-        sbar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                iservice.callSeekToPosition(seekBar.getProgress());
-            }
-        });
-
     }
+    private void resetTextView() {
+        mLocal.setTextColor(Color.BLACK);
+        mInternet.setTextColor(Color.BLACK);
+        mOther.setTextColor(Color.BLACK);
 
-
-    public void click1(View view) {
-        if (uri != null) {
-            iservice.callPlayMusic(uri,name,singer,bitmap,album);
-        } else {
-            Snackbar snackbar = Snackbar.make(view, "没有音乐文件", Snackbar.LENGTH_SHORT);
-            snackbar.show();
-        }
-
-    }
-
-    public void click2(View view) {
-        iservice.callPauseMusic();
-        if (palying.getText().equals("暂停")) {
-            palying.setText("播放");
-        } else if (palying.getText().equals("播放")) {
-            palying.setText("暂停");
-
-        }
-    }
-
-    public void click3(View view) {
-        iservice.callReplayMusic();
     }
 
 
@@ -149,17 +181,7 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
-    private class Myconn implements ServiceConnection {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            iservice = (Iservice) service;
-        }
 
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-
-        }
-    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -172,11 +194,11 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_search:
-                Toast.makeText(getApplicationContext(), "正在扫描", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getApplicationContext(), "扫描完成", Toast.LENGTH_SHORT).show();
                 break;
             case R.id.action_exit:
-                unbindService(myconn);
-                Intent intent = new Intent(this,MusicService.class);
+                //unbindService(myconn);
+                Intent intent = new Intent(this, MusicService.class);
                 stopService(intent);
                 System.exit(0);
                 break;
